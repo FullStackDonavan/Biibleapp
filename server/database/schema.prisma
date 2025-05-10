@@ -1,0 +1,515 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+  binaryTargets   = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+//datasource db {
+//  provider  = "postgresql"
+//  url       = env("POSTGRES_PRISMA_URL")
+//  directUrl = env("POSTGRES_URL_NON_POOLING")
+//}
+
+model User {
+  id                   Int                  @id @default(autoincrement())
+  loginType            String?              @default("email")
+  password             String?
+  email                String?              @unique
+  firstName            String?
+  lastName             String?
+  username             String?              @unique
+  phone                String?              @unique
+  coverImage           String? // Field for storing cover image URL
+  avatar               String? // Field for storing avatar URL
+  session              Session[]
+  stripeCustomerId     String?
+  Subscription         Subscription[]
+  highlightedVerses    HighlightedVerse[]
+  friendships          Friendship[]         @relation("UserFriendship")
+  friendOf             Friendship[]         @relation("FriendUser")
+  notes                Note[]
+  photos               Photo[] // Define the relationship with the Photo model
+  places               Place[] // Backrelation for places
+  posts                Post[]
+  reactions            Reaction[]
+  prayerJournalEntries PrayerJournalEntry[]
+  games                Game[]
+  likedGames           LikedGame[]
+  adImpressions        AdImpression[]
+  videos               Video[]
+  liveStream           LiveStream?
+  groupsAdmin          Group[]              @relation("GroupAdmin")
+  groupMemberships     GroupMember[]
+  groupPosts           GroupPost[]
+  groupPhotos     GroupPhoto[]
+  groupVideos     GroupVideo[]
+  groupReactions  GroupReaction[]
+  groupComments   GroupComment[]
+
+}
+
+model LiveStream {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id])
+  channelArn     String
+  ingestEndpoint String
+  streamKey      String
+  playbackUrl    String
+  createdAt      DateTime @default(now())
+
+  @@unique([userId])
+}
+
+model Session {
+  id        Int       @id @default(autoincrement())
+  authToken String    @unique
+  user      User      @relation(fields: [userId], references: [id])
+  userId    Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+model Subscription {
+  id            Int       @id @default(autoincrement())
+  user          User      @relation(fields: [userId], references: [id])
+  userId        Int
+  stripeId      String    @unique
+  stripeStatus  String?
+  stripePriceId String?
+  quantity      Int?
+  trialEndsAt   DateTime?
+  endsAt        DateTime?
+  startDate     DateTime
+  lastEventDate DateTime
+}
+
+model Verses {
+  id              Int      @id @default(autoincrement())
+  number          Int
+  text            String   @db.Text
+  cleanText       String?  @db.Text
+  transliteration String?
+  translationText String?
+  words           Json?    @db.Json
+  chapterId       Int
+  chapter         Chapters @relation(fields: [chapterId], references: [id])
+
+  translationId Int
+  translation   Translation @relation(fields: [translationId], references: [id], onDelete: Cascade)
+
+  highlightedVerses   HighlightedVerse[]
+  notes               Note[]
+  places              Place[]            @relation("VersePlaces")
+  fromCrossReferences CrossReference[]   @relation("FromCrossReference")
+  toCrossReferences   CrossReference[]   @relation("ToCrossReference")
+}
+
+model WordTranslation {
+  id               Int     @id @default(autoincrement())
+  lookupText       String?
+  xmlId            String  @unique
+  ref              String
+  class            String?
+  text             String
+  transliteration  String?
+  after            String?
+  strongNumberX    String?
+  strongLemma      String?
+  senseNumber      String?
+  greek            String?
+  greekStrong      String?
+  gloss            String?
+  english          String?
+  mandarin         String?
+  stem             String?
+  morph            String?
+  lang             String?
+  lemma            String?
+  pos              String?
+  person           String?
+  gender           String?
+  number           String?
+  state            String?
+  type             String?
+  lexdomain        String?
+  contextualdomain String?
+  coredomain       String?
+  sdbh             String?
+  extends          String?
+  frame            String?
+  subjref          String?
+  participantref   String?
+}
+
+model Chapters {
+  id            Int      @id @default(autoincrement())
+  number        Int
+  bookId        Int
+  translationId Int
+  book          Books    @relation(fields: [bookId], references: [id])
+  verses        Verses[]
+
+  @@unique([bookId, number]) // Composite unique constraint
+}
+
+model Books {
+  id            Int         @id @default(autoincrement())
+  name          String
+  translationId Int
+  translation   Translation @relation(fields: [translationId], references: [id])
+  chapters      Chapters[]
+
+  @@unique([name, translationId]) // Add this compound unique constraint
+}
+
+model Translation {
+  id          Int      @id @default(autoincrement())
+  translation String   @unique // Ensure this field is unique
+  title       String // Add this field
+  license     String // Add this field
+  books       Books[]
+  verses      Verses[]
+}
+
+model HighlightedVerse {
+  id          Int     @id @default(autoincrement())
+  userId      Int
+  user        User    @relation(fields: [userId], references: [id])
+  verseId     Int
+  verse       Verses  @relation(fields: [verseId], references: [id])
+  highlighted Boolean @default(false)
+  color       String? @default("yellow") // Add color field with a default value
+
+  @@unique([verseId, userId]) // Composite unique constraint
+}
+
+model Friendship {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  friendId  Int
+  createdAt DateTime @default(now())
+
+  user   User @relation("UserFriendship", fields: [userId], references: [id])
+  friend User @relation("FriendUser", fields: [friendId], references: [id])
+
+  @@unique([userId, friendId]) // Ensure unique relationships
+}
+
+model Note {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  verseId   Int
+  verse     Verses   @relation(fields: [verseId], references: [id])
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, verseId]) // Ensure one note per user per verse
+}
+
+model Photo {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  postId    Int? // Optional: Link to Post
+  url       String?  @db.Text
+  createdAt DateTime @default(now())
+
+  user User  @relation(fields: [userId], references: [id])
+  post Post? @relation(fields: [postId], references: [id]) // Optional relation to a post
+}
+
+model Place {
+  id        Int      @id @default(autoincrement())
+  userId    Int // ID of the user who created this place
+  verseId   Int // ID of the associated verse
+  name      String // Name of the place
+  location  String? // Optional location
+  user      User     @relation(fields: [userId], references: [id]) // Relation to the User model
+  verse     Verses   @relation("VersePlaces", fields: [verseId], references: [id]) // Relation to the Verses model with matching relation name
+  createdAt DateTime @default(now()) // Timestamp of creation
+
+  @@unique([userId, verseId, name]) // Composite unique constraint to prevent duplicates
+}
+
+model CrossReference {
+  id          Int    @id @default(autoincrement())
+  fromVerseId Int
+  fromVerse   Verses @relation("FromCrossReference", fields: [fromVerseId], references: [id], onDelete: Cascade)
+
+  toVerseId Int
+  toVerse   Verses @relation("ToCrossReference", fields: [toVerseId], references: [id], onDelete: Cascade)
+
+  votes Int @default(0) // Popularity ranking
+
+  createdAt DateTime @default(now())
+
+  @@unique([fromVerseId, toVerseId]) // Ensure each link is unique
+}
+
+model Post {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id])
+  type           String // Type of post: 'text', 'video', 'meme', etc.
+  content        Json // Store content data (e.g., video details for video posts)
+  createdAt      DateTime @default(now())
+  totalReactions Int      @default(0)
+
+  reactions Reaction[]
+  photos    Photo[] // Relation to Photo model
+}
+
+model Reaction {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  postId    Int
+  type      String // Example values: "like", "love", "laugh", "pray", etc.
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  post Post @relation(fields: [postId], references: [id])
+
+  @@unique([userId, postId]) // ✅ Each user can react to a post only once
+}
+
+model Polemics {
+  id        Int      @id @default(autoincrement())
+  category  String // e.g., "Islam", "Atheism", "Jehovah's Witnesses"
+  claim     String // The polemical argument
+  createdAt DateTime @default(now())
+}
+
+model Devotional {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String   @db.Text
+  date      DateTime
+  verse     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PrayerJournalEntry {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model QuranTranslation {
+  id      Int          @id @default(autoincrement())
+  code    String       @unique // e.g., "en.sahih", "ar.original"
+  name    String
+  license String
+  surahs  QuranSurah[]
+  ayahs   QuranAyah[]
+}
+
+model QuranSurah {
+  id              Int              @id @default(autoincrement())
+  number          Int
+  name            String // e.g., "An-Nisa"
+  transliteration String
+  translatedTitle String
+  revelationType  String // e.g., "Meccan" or "Medinan"
+  totalVerses     Int
+  translationId   Int
+  translation     QuranTranslation @relation(fields: [translationId], references: [id])
+  ayahs           QuranAyah[]
+
+  @@unique([number, translationId])
+}
+
+model QuranAyah {
+  id             Int              @id @default(autoincrement())
+  surahNumber    Int
+  ayahNumber     Int
+  text           String           @db.Text // Arabic
+  translation    String           @db.Text // English
+  surahId        Int
+  translationId  Int
+  surah          QuranSurah       @relation(fields: [surahId], references: [id])
+  translationRel QuranTranslation @relation(fields: [translationId], references: [id])
+}
+
+model Game {
+  id          Int         @id @default(autoincrement())
+  userId      Int
+  user        User        @relation(fields: [userId], references: [id])
+  title       String
+  slug        String      @unique
+  description String
+  path        String // e.g., /games/slug/index.html
+  poster      String?
+  book        String? // Optional: e.g., "Genesis"
+  theme       String? // Optional: e.g., "Faith"
+  tags        Tag[]       @relation("GameTags")
+  createdAt   DateTime    @default(now())
+  likedBy     LikedGame[]
+  adId        Int? // Optional: link to the Ad model
+  ad          Ad?         @relation("GameAds", fields: [adId], references: [id]) // Relation to Ad model
+
+  adImpressions AdImpression[]
+}
+
+model Tag {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  games Game[] @relation("GameTags")
+}
+
+model LikedGame {
+  userId Int
+  gameId Int
+
+  user User @relation(fields: [userId], references: [id])
+  game Game @relation(fields: [gameId], references: [id])
+
+  @@id([userId, gameId])
+}
+
+model AdImpression {
+  id        Int      @id @default(autoincrement())
+  adId      Int // Foreign key to the Ad table
+  gameId    Int? // Optional: Ad impression for game-specific ads
+  userId    Int // User who saw the ad
+  createdAt DateTime @default(now()) // Timestamp of the ad impression
+
+  ad   Ad?   @relation(fields: [adId], references: [id]) // Relation to Ad
+  user User  @relation(fields: [userId], references: [id]) // Relation to User
+  game Game? @relation(fields: [gameId], references: [id]) // Relation to Game
+
+  @@index([adId]) // Index to speed up queries by adId
+  @@index([userId]) // Index to speed up queries by userId
+}
+
+model Ad {
+  id          Int      @id @default(autoincrement())
+  title       String // The name of the ad, e.g., "Bible Study Ad"
+  media_type  String // 'video', 'image', 'html' (what type of ad)
+  media_url   String   @db.Text
+  cta_url     String // Call to action URL (e.g., landing page or product page)
+  placement   String // 'video_pre', 'video_mid', 'game_banner', 'feed_inline' (where the ad will appear)
+  duration    Int? // Only for video ads (e.g., 15 for 15 seconds)
+  targeting   Json? // JSON object for targeting, e.g., `{ "country": "US", "user_type": "premium" }`
+  status      String // 'active', 'paused', 'expired'
+  created_at  DateTime @default(now()) // Timestamp of creation
+  updated_at  DateTime @updatedAt // Timestamp of last update
+  impressions Int      @default(0) // Number of impressions this ad has had
+  clicks      Int      @default(0) // Number of clicks this ad has had
+
+  adImpressions AdImpression[]
+  games         Game[]         @relation("GameAds") // Add reverse relation to Game
+}
+
+model Video {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  videoUrl    String // URL of the video file
+  description String // Description of the video
+  duration    Int // Duration of the video in seconds
+  createdAt   DateTime @default(now())
+}
+
+model Group {
+  id          Int           @id @default(autoincrement())
+  name        String
+  description String
+  visibility  String
+  adminId     Int
+  admin       User          @relation("GroupAdmin", fields: [adminId], references: [id])
+  members     GroupMember[]
+  posts       GroupPost[]
+  createdAt   DateTime      @default(now())
+}
+
+model GroupMember {
+  id       Int       @id @default(autoincrement())
+  group    Group     @relation(fields: [groupId], references: [id])
+  groupId  Int
+  user     User      @relation(fields: [userId], references: [id])
+  userId   Int
+  status   String // "pending", "approved"
+  joinedAt DateTime?
+
+  @@unique([groupId, userId]) // Composite unique constraint
+}
+
+model GroupPost {
+  id             Int        @id @default(autoincrement())
+  groupId        Int
+  userId         Int
+  type           String
+  content        Json
+  createdAt      DateTime   @default(now())
+  totalReactions Int        @default(0)
+
+  group          Group      @relation(fields: [groupId], references: [id])
+  author         User       @relation(fields: [userId], references: [id])
+
+  photos         GroupPhoto[]
+  videos         GroupVideo[]
+  reactions      GroupReaction[]
+  comments        GroupComment[]
+
+}
+
+
+
+model GroupPhoto {
+  id         Int        @id @default(autoincrement())
+  userId     Int
+  groupId      Int  
+  groupPostId Int?       // Optional: Link to GroupPost
+  url        String?     @db.Text
+  createdAt  DateTime    @default(now())
+
+  user       User        @relation(fields: [userId], references: [id])
+  groupPost  GroupPost?  @relation(fields: [groupPostId], references: [id])
+}
+
+
+model GroupVideo {
+  id          Int        @id @default(autoincrement())
+  userId      Int
+  groupPostId Int?       // Optional: Link to GroupPost
+  videoUrl    String
+  description String
+  duration    Int
+  createdAt   DateTime   @default(now())
+
+  user        User       @relation(fields: [userId], references: [id])
+  groupPost   GroupPost? @relation(fields: [groupPostId], references: [id])
+}
+model GroupReaction {
+  id          Int        @id @default(autoincrement())
+  userId      Int
+  groupPostId Int
+  type        String     // e.g., 'like', 'love', 'amen'
+  createdAt   DateTime   @default(now())
+
+  user        User       @relation(fields: [userId], references: [id])
+  groupPost   GroupPost  @relation(fields: [groupPostId], references: [id])
+}
+model GroupComment {
+  id          Int        @id @default(autoincrement())
+  userId      Int
+  groupPostId Int
+  content     String
+  createdAt   DateTime   @default(now())
+
+  user        User       @relation(fields: [userId], references: [id])
+  groupPost   GroupPost  @relation(fields: [groupPostId], references: [id])
+}

@@ -1,0 +1,35 @@
+# Node modules
+node_modules/
+
+# Nuxt build output
+.nuxt/
+.nitro/
+.output/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment files (keep secrets out of Git!)
+.env
+.env.*          # Covers .env.production, .env.development, etc.
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE/editor settings
+.vscode/
+.idea/
+
+# Cache directories
+.cache/
+
+# Prisma generated client (optional to ignore)
+# prisma/generated/
+
+# Build artifacts
+*.tsbuildinfo
+
+auth.json
